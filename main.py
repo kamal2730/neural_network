@@ -5,6 +5,9 @@ nnfs.init()
 from nnfs.datasets import spiral_data
 import matplotlib.pyplot as plt
 
+class Layer_Input:
+    def forward(self,inputs):
+        self.output=inputs
 class Layer_Dense:
     def __init__(self,n_inputs,n_neurons,weight_regularizer_l1=0,weight_regularizer_l2=0,bias_regularizer_l1=0,bias_regularizer_l2=0):
         self.weights=0.01*np.random.randn(n_inputs,n_neurons)
@@ -52,7 +55,6 @@ class Activation_Softmax:
             single_output=single_output.reshape(-1,1)
             jacobian_matrix=np.diagflat(single_output)-np.dot(single_output,single_output.T)
             self.dinputs[index]=np.dot(jacobian_matrix,single_dvalues)
-
 class Loss:
     def regularization_loss(self,layer):
         regularization_loss=0
@@ -174,6 +176,41 @@ class Layer_Droput:
         self.output=inputs*self.binary_mask
     def backward(self,dvalues):
         self.dinputs=dvalues*self.binary_mask
+class Model:
+    def __init__(self):
+        self.layers=[]
+    def add(self,layer):
+        self.layers.append(layer)
+    def set(self,*,loss,optimizer):
+        self.loss=loss
+        self.optimizer=optimizer
+    def train(self,X,y,*,epoch=1,print_every=1):
+        for epoch in range(1,epoch+1):
+            output=self.forward(X)
+            print(output)
+            exit()
+    def finalize(self):
+        self.input_layer=Layer_Input()
+        layer_count=len(self.layers)
+        for i in range(layer_count):
+            if i==0:
+                self.layers[i].prev=self.input_layer
+                self.layers[i].next=self.layers[i+1]
+            elif i <layer_count-1:
+                self.layers[i].prev=self.layers[i-1]
+                self.layers[i].next=self.layers[i+1]
+            else:
+                self.layers[i].prev=self.layers[i-1]
+                self.layers[i].next=self.loss
+    def forward(self,X):
+        self.input_layer.forward(X)
+        for layer in self.layers:
+            layer.forward(layer.prev.output)
+
+        return layer.output
+    
+
+
 X,y=spiral_data(samples=1000,classes=3)
 plt.scatter(X[:,0],X[:,1],c=y,cmap='brg')
 
