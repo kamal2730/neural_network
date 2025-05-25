@@ -1,9 +1,31 @@
 import numpy as np
-import nnfs
 import copy
-nnfs.init()
-from nnfs.datasets import spiral_data
 import matplotlib.pyplot as plt
+from sklearn.datasets import fetch_openml
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+import numpy as np
+
+
+X, y = fetch_openml("mnist_784", version=1, return_X_y=True, as_frame=False)
+y = y.astype(np.int64)
+X = X / 255.0
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=10000, random_state=42, stratify=y)
+
+print(f"Train shape: {X_train.shape}, Test shape: {X_test.shape}")
+
+def get_batches(X, y, batch_size):
+    # Shuffle data
+    indices = np.arange(X.shape[0])
+    np.random.shuffle(indices)
+    X_shuffled = X[indices]
+    y_shuffled = y[indices]
+    
+    # Yield batches
+    for i in range(0, X.shape[0], batch_size):
+        X_batch = X_shuffled[i:i + batch_size]
+        y_batch = y_shuffled[i:i + batch_size]
+        yield X_batch, y_batch
 
 class Layer_Input:
     def forward(self,inputs):
@@ -211,59 +233,49 @@ class Model:
     
 
 
-X,y=spiral_data(samples=1000,classes=3)
-plt.scatter(X[:,0],X[:,1],c=y,cmap='brg')
 
 
-dense1=Layer_Dense(2,512,weight_regularizer_l2=5e-4,bias_regularizer_l2=5e-4)
+dense1=Layer_Dense(784,512,weight_regularizer_l2=5e-4,bias_regularizer_l2=5e-4)
 activation1=Activation_ReLU()
 dropout1=Layer_Droput(0.1)
-dense2=Layer_Dense(512,3)
+dense2=Layer_Dense(512,10)
 loss_activation=Activation_Softmax_Loss_CategoricalCrossentropy()
 optimizer=Optimizer_Adam(learning_rate=0.05,decay=5e-5)
-for epoch in range(10001):
-    dense1.forward(X)
+for epoch in range(30):
+    for X_batch, y_batch in get_batches(X_train, y_train, 32):
+        dense1.forward(X_batch)
+        activation1.forward(dense1.output)
+        dropout1.forward(activation1.output)
+        dense2.forward(dropout1.output)
+        data_loss=loss_activation.forward(dense2.output,y_batch)
+        regularization_loss=loss_activation.loss.regularization_loss(dense1)+loss_activation.loss.regularization_loss(dense2)
+        loss=data_loss+regularization_loss
+
+        predictions=np.argmax(loss_activation.output,axis=1)
+        if len(y_batch.shape)==2:
+            y_batch=np.argmax(y_batch,axis=1)
+        accuracy=np.mean(predictions==y_batch)
+        #backward pass
+        loss_activation.backward(loss_activation.output,y_batch)
+        dense2.backward(loss_activation.dinputs)
+        dropout1.backward(dense2.dinputs)
+        activation1.backward(dropout1.dinputs)
+        dense1.backward(activation1.dinputs)
+
+        optimizer.pre_update_params()
+        optimizer.update_params(dense1)
+        optimizer.update_params(dense2)
+        optimizer.post_update_params()
+    #testing 
+    print(f'epoch:{epoch},acc:{accuracy:.3f},loss:{loss:.3f},data_loss:{data_loss},reg_loss:{regularization_loss},lr:{optimizer.current_learning_rate}')
+    dense1.forward(X_test)
     activation1.forward(dense1.output)
-    dropout1.forward(activation1.output)
-    dense2.forward(dropout1.output)
-    data_loss=loss_activation.forward(dense2.output,y)
-    regularization_loss=loss_activation.loss.regularization_loss(dense1)+loss_activation.loss.regularization_loss(dense2)
-    loss=data_loss+regularization_loss
+    dense2.forward(activation1.output)
+    loss=loss_activation.forward(dense2.output,y_test)
 
     predictions=np.argmax(loss_activation.output,axis=1)
-    if len(y.shape)==2:
-        y=np.argmax(y,axis=1)
-    accuracy=np.mean(predictions==y)
+    if len(y_test.shape)==2:
+        y_test=np.argmax(y_test,axis=1)
+    accuracy=np.mean(predictions==y_test)
 
-
-    if not epoch%100:
-        print(f'epoch:{epoch},acc:{accuracy:.3f},loss:{loss:.3f},data_loss:{data_loss},reg_loss:{regularization_loss},lr:{optimizer.current_learning_rate}')
-    #backward pass
-    loss_activation.backward(loss_activation.output,y)
-    dense2.backward(loss_activation.dinputs)
-    dropout1.backward(dense2.dinputs)
-    activation1.backward(dropout1.dinputs)
-    dense1.backward(activation1.dinputs)
-
-    optimizer.pre_update_params()
-    optimizer.update_params(dense1)
-    optimizer.update_params(dense2)
-    optimizer.post_update_params()
-
-
-#testing 
-X_test,y_test=spiral_data(samples=100,classes=3)
-dense1.forward(X_test)
-activation1.forward(dense1.output)
-dense2.forward(activation1.output)
-loss=loss_activation.forward(dense2.output,y_test)
-
-predictions=np.argmax(loss_activation.output,axis=1)
-if len(y_test.shape)==2:
-    y_test=np.argmax(y_test,axis=1)
-accuracy=np.mean(predictions==y_test)
-
-print('validation accuracy:',accuracy)
-
-plt.scatter(X_test[:,0],X_test[:,1],c=y_test,cmap='magma')
-#plt.show()
+    print('validation accuracy:',accuracy)

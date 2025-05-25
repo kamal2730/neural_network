@@ -172,3 +172,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+#custom
+.DS_Store
+tempCodeRunnerFile.py
+test/
+torch_.py
+train/
