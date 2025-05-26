@@ -182,3 +182,7 @@ train/
 aug.py
 augmented_train/
 test.ipynb
+test-2/
+train-2/
+augmented_train-2/
+Archive.zip
