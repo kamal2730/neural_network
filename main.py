@@ -27,9 +27,6 @@ def get_batches(X, y, batch_size):
         y_batch = y_shuffled[i:i + batch_size]
         yield X_batch, y_batch
 
-class Layer_Input:
-    def forward(self,inputs):
-        self.output=inputs
 class Layer_Dense:
     def __init__(self,n_inputs,n_neurons,weight_regularizer_l1=0,weight_regularizer_l2=0,bias_regularizer_l1=0,bias_regularizer_l2=0):
         self.weights=0.01*np.random.randn(n_inputs,n_neurons)
@@ -126,33 +123,7 @@ class Activation_Softmax_Loss_CategoricalCrossentropy():
         self.dinputs=dvalues.copy()
         self.dinputs[range(samples),y_true]-=1
         self.dinputs=self.dinputs/samples
-class Optimizer_SGD:
-    def __init__(self,learning_rate=1.,decay=0.,momentum=0.):
-        self.learning_rate=learning_rate
-        self.current_learning_rate=learning_rate
-        self.decay=decay
-        self.iterations=0
-        self.momentum=momentum
-    def pre_update_params(self):
-        if self.decay:
-            self.current_learning_rate=self.learning_rate*(1/(1+self.decay*self.iterations))
-    def update_params(self,layer):
-        if self.momentum:
-            if not hasattr(layer,'weight_momentums'):
-                layer.weight_momentums=np.zeros_like(layer.weights)
-                layer.bias_momentums=np.zeros_like(layer.biases)
-            weight_updates=self.momentum*layer.weight_momentums-self.current_learning_rate*layer.dweights
-            layer.weight_momentums=weight_updates
-            bias_updates=self.momentum*layer.bias_momentums-self.current_learning_rate*layer.dbiases
-            layer.bias_momentums=bias_updates
-        else:
-            weight_updates=-self.current_learning_rate*layer.dweights
-            bias_updates=-self.current_learning_rate*layer.dbiases
-            
-        layer.weights+=weight_updates
-        layer.biases+=bias_updates
-    def post_update_params(self):
-        self.iterations+=1
+
 class Optimizer_Adam:
     def __init__(self,learning_rate=0.001,decay=0.,epsilon=1e-7,beta_1=0.9,beta_2=0.999):
         self.learning_rate=learning_rate
@@ -198,41 +169,6 @@ class Layer_Droput:
         self.output=inputs*self.binary_mask
     def backward(self,dvalues):
         self.dinputs=dvalues*self.binary_mask
-class Model:
-    def __init__(self):
-        self.layers=[]
-    def add(self,layer):
-        self.layers.append(layer)
-    def set(self,*,loss,optimizer):
-        self.loss=loss
-        self.optimizer=optimizer
-    def train(self,X,y,*,epoch=1,print_every=1):
-        for epoch in range(1,epoch+1):
-            output=self.forward(X)
-            print(output)
-            exit()
-    def finalize(self):
-        self.input_layer=Layer_Input()
-        layer_count=len(self.layers)
-        for i in range(layer_count):
-            if i==0:
-                self.layers[i].prev=self.input_layer
-                self.layers[i].next=self.layers[i+1]
-            elif i <layer_count-1:
-                self.layers[i].prev=self.layers[i-1]
-                self.layers[i].next=self.layers[i+1]
-            else:
-                self.layers[i].prev=self.layers[i-1]
-                self.layers[i].next=self.loss
-    def forward(self,X):
-        self.input_layer.forward(X)
-        for layer in self.layers:
-            layer.forward(layer.prev.output)
-
-        return layer.output
-    
-
-
 
 
 dense1=Layer_Dense(784,512,weight_regularizer_l2=5e-4,bias_regularizer_l2=5e-4)
